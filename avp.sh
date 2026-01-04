@@ -5,14 +5,15 @@ URL="https://github.com/vucoffee2310/youtubedownloader/releases/download/pyav-cu
 FILENAME="pyav-custom.tar.gz"
 DIRNAME="pyav"
 
-# --- THE FIX: Stop if already installed ---
+# --- 1. PREVENT DOUBLE INSTALL (Saves 2 mins) ---
 if pip show av >/dev/null 2>&1; then
-    echo "✅ 'av' is already installed. Skipping installation."
+    echo "✅ [CACHE HIT] 'av' is already installed. Skipping build."
     exit 0
 fi
-# ------------------------------------------
 
-echo "--- 1. Downloading ---"
+# --- 2. DOWNLOAD & EXTRACT ---
+echo "--- Downloading & Extracting ---"
+# Only download if not already extracted
 if [ ! -d "$DIRNAME" ]; then
     if [ ! -f "$FILENAME" ]; then
         if command -v curl >/dev/null 2>&1; then
@@ -24,24 +25,23 @@ if [ ! -d "$DIRNAME" ]; then
             exit 1
         fi
     fi
-
-    echo "--- 2. Extracting ---"
     chmod 755 "$FILENAME"
     tar -xf "$FILENAME"
-fi
-
-echo "--- 3. Setup and Install ---"
-if [ -d "$DIRNAME" ]; then
-    cd "$DIRNAME" || return
-    
-    # Source the environment variables
-    if [ -f "scripts/activate.sh" ]; then
-        source scripts/activate.sh
-    fi
-
-    echo "🚀 Compiling and Installing (This takes ~2 mins)..."
-    pip install .
 else
-    echo "Error: Folder '$DIRNAME' not found."
-    exit 1
+    echo "Folder '$DIRNAME' already exists."
 fi
+
+# --- 3. SET VARIABLES DIRECTLY (No 'source' needed) ---
+# We calculate absolute path to the extracted folder
+REPO_DIR="$(pwd)/$DIRNAME"
+FFMPEG_DIR="$REPO_DIR/vendor/build/ffmpeg-8.0"
+
+echo "--- Setting Environment Variables ---"
+echo "Target FFMPEG: $FFMPEG_DIR"
+
+# These are the exact values 'activate.sh' would have set
+export PYAV_ROOT="$REPO_DIR"
+export PYAV_LIBRARY="ffmpeg-8.0"
+export PYAV_LIBRARY_PREFIX="$FFMPEG_DIR"
+
+# Crucial paths for the c
