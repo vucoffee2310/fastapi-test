@@ -6,13 +6,13 @@ FILENAME="pyav-custom.tar.gz"
 DIRNAME="pyav"
 
 # --- 1. PREVENT DOUBLE INSTALL ---
-if pip show av >/dev/null 2>&1; then
-    echo "✅ [CACHE HIT] 'av' is already installed. Skipping."
+# Check if python package is installed AND the library folder exists
+if [ -d "$DIRNAME/lib" ] && pip show av >/dev/null 2>&1; then
+    echo "✅ [CACHE HIT] 'av' is installed and libs exist. Skipping build."
     exit 0
 fi
 
 # --- 2. DOWNLOAD & EXTRACT ---
-# Only proceed if the directory doesn't exist yet
 if [ ! -d "$DIRNAME" ]; then
     echo "--- Downloading custom PyAV archive ---"
     if [ ! -f "$FILENAME" ]; then
@@ -30,41 +30,54 @@ if [ ! -d "$DIRNAME" ]; then
     tar -xf "$FILENAME"
 fi
 
-# --- 3. CONFIGURE & INSTALL ---
+# --- 3. CONFIGURE, MAKE, & INSTALL ---
 if [ -d "$DIRNAME" ]; then
     cd "$DIRNAME" || return
-    
-    # Get absolute path of the extracted folder
     LOCAL_ROOT="$(pwd)"
     
     echo "--- Setting Local Paths ---"
-    echo "Root: $LOCAL_ROOT"
-    
-    # Point directly to the 'lib' and 'include' folders at the root of the extracted archive
+    # Point compiler and linker to the local 'lib' and 'include' folders
     export PKG_CONFIG_PATH="$LOCAL_ROOT/lib/pkgconfig:$PKG_CONFIG_PATH"
     export LD_LIBRARY_PATH="$LOCAL_ROOT/lib:$LD_LIBRARY_PATH"
     export CFLAGS="-I$LOCAL_ROOT/include"
     export LDFLAGS="-L$LOCAL_ROOT/lib"
 
-    echo "🚀 Compiling PyAV..."
-    # Install the package
+    # --- STEP A: MAKE ---
+    echo "🔨 Running 'make'..."
+    if make; then
+        echo "✅ Make successful."
+    else
+        echo "⚠️ Make failed or no Makefile found. Attempting pip install anyway..."
+    fi
+
+    # --- STEP B: PIP INSTALL ---
+    echo "🚀 Running 'pip install .'..."
     pip install .
-    
-    # Capture the result of the installation
     INSTALL_STATUS=$?
 
-    # Move back to the parent directory so we can delete the folder
+    # Go back to root
     cd ..
 
-    # --- 4. CLEANUP ---
+    # --- 4. SMART CLEANUP ---
     if [ $INSTALL_STATUS -eq 0 ]; then
         echo "✅ Installation successful."
-        echo "🧹 Cleaning up source files and archive..."
-        rm -rf "$DIRNAME"
+        
+        echo "🧹 Cleaning up sources (keeping libs)..."
+        # Remove source code and headers to save space
+        rm -rf "$DIRNAME/include"
+        rm -rf "$DIRNAME/src"
+        rm -rf "$DIRNAME/examples"
+        rm -rf "$DIRNAME/tests"
+        rm -rf "$DIRNAME/docs"
+        # Remove the downloaded archive
         rm -f "$FILENAME"
+
+        # ⚠️ CRITICAL: DO NOT DELETE "$DIRNAME/lib" 
+        # The app will crash if you delete this.
+        
         echo "✨ Cleanup complete."
     else
-        echo "❌ Installation failed. Files preserved for debugging."
+        echo "❌ Installation failed."
         exit 1
     fi
 
