@@ -5,9 +5,9 @@ URL="https://github.com/vucoffee2310/youtubedownloader/releases/download/pyav-cu
 FILENAME="pyav-custom.tar.gz"
 DIRNAME="pyav"
 
-# --- 1. CHECK: Is it already installed? (Saves time on Vercel) ---
+# --- 1. PREVENT DOUBLE INSTALL ---
 if pip show av >/dev/null 2>&1; then
-    echo "✅ [CACHE HIT] 'av' is already installed. Skipping everything."
+    echo "✅ [CACHE HIT] 'av' is already installed. Skipping."
     exit 0
 fi
 
@@ -29,30 +29,33 @@ if [ ! -d "$DIRNAME" ]; then
     tar -xf "$FILENAME"
 fi
 
-# --- 3. CONFIGURE PATHS DIRECTLY ---
-# We calculate the absolute path to the extracted folder
-PYAV_ROOT="$(pwd)/$DIRNAME"
-
-# Based on your previous script, the included files are here:
-FFMPEG_LOCAL="$PYAV_ROOT/vendor/build/ffmpeg-8.0"
-
-echo "--- Pointing to local 'lib' and 'include' ---"
-echo "Root: $FFMPEG_LOCAL"
-
-# This is the MAGIC part. 
-# By setting PKG_CONFIG_PATH to your local folder, 
-# PyAV will find the 'include' and 'lib' folders there and WON'T download FFmpeg.
-export PKG_CONFIG_PATH="$FFMPEG_LOCAL/lib/pkgconfig:$PKG_CONFIG_PATH"
-
-# Also set library paths so the compiler finds them
-export LD_LIBRARY_PATH="$FFMPEG_LOCAL/lib:$LD_LIBRARY_PATH"
-export CFLAGS="-I$FFMPEG_LOCAL/include"
-export LDFLAGS="-L$FFMPEG_LOCAL/lib"
-
-# --- 4. INSTALL ---
+# --- 3. CONFIGURE & INSTALL ---
 if [ -d "$DIRNAME" ]; then
     cd "$DIRNAME" || return
-    echo "🚀 Compiling PyAV using local files..."
     
-    # Install directly. It will use the env vars exported above.
+    # Get the absolute path of the current extracted folder
+    LOCAL_ROOT="$(pwd)"
+    
+    echo "--- Setting Local Paths ---"
+    echo "Using libs from: $LOCAL_ROOT"
+    
+    # Based on your tree output:
+    # 1. 'lib/pkgconfig' is where the .pc files are
+    export PKG_CONFIG_PATH="$LOCAL_ROOT/lib/pkgconfig:$PKG_CONFIG_PATH"
+    
+    # 2. 'lib' contains the compiled .so files
+    export LD_LIBRARY_PATH="$LOCAL_ROOT/lib:$LD_LIBRARY_PATH"
+    
+    # 3. Explicitly tell C compiler where to find headers and libraries
+    export CFLAGS="-I$LOCAL_ROOT/include"
+    export LDFLAGS="-L$LOCAL_ROOT/lib"
+
+    echo "🚀 Compiling PyAV..."
+    # Install using the local files defined above
     pip install .
+    
+    echo "✅ Done."
+else
+    echo "Error: Folder '$DIRNAME' not found."
+    exit 1
+fi
